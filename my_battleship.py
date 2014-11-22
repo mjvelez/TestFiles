@@ -1,4 +1,5 @@
-"""Version: 1.0
+"""
+    Version: 1.0
     Program: my_battleship
 
     This is my_battleship, the first program that I am going to write on my own
@@ -17,11 +18,19 @@ board = []
     #Use a for in range loop
 for rows in range(0,5):
     board.append(["O"] * 5)
-    print board[rows]
 
-#Reformat the list to have a cleaner board
-#board.joining(" ")
+#Function that will print the blank board
+def print_board(rows):
+    for row in rows:
+        print " ".join(row)
 
+#Create random variables and hide battleships
+from random import randint
+
+random_row = randint(0,5)
+random_col = randint(0,5)
+
+board[random_row][random_col] = "X"
 
 #Print the results to check the progress!!
-#print board
+print_board(board)
