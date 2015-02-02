@@ -1,0 +1,219 @@
+////Create an account sObject & log the new ID in the debug log
+//
+//Create the account sObject
+Account acct = new Account(Name='Mrs Fluffy Pants', Phone='(416)555-1212', NumberOfEmployees=102);
+//Insert the account by using DML
+insert acct;
+
+//Get the new ID on the inserted sObject argument
+ID acctID = acct.Id;
+//Display this ID in the debug log
+System.debug('ID = ' + acctID);
+
+//Debug log result (the ID will be different in your case)
+//DEBUG|ID = 001D000000JmKkeIAF
+
+
+
+////Create a list of contacts, insert then, then push a criteria update
+//
+//Create a list of contacts
+List<Contact> conList = new List<Contact> {
+    new Contact(FirstName='Joey',LastName='Barglowski',Department='Finance'),
+        new Contact(FirstName='Kathy',LastName='Smith',Department='Technology'),
+        new Contact(FirstName='Caroline',LastName='Roth',Department='Finance'),
+        new Contact(FirstName='Kim',LastName='Shain',Department='Education')};
+    
+//Bulk insert all contacts with one DML call
+insert conList;
+
+//List to hold the new contacts to update
+List<Contact> listToUpdate = new List<Contact>();
+
+//Iterate through the list and add a title only
+//	if the department is Finance
+for(Contact con : conList) {
+    if(Con.Department == 'Finance') {
+       con.Title = 'Financial analyst';
+       // Add updated contact sObject to the list.
+       listToUpdate.add(con);
+    }
+}
+
+//Bulk update all contacts with one DML call
+update listToUpdate;
+
+
+
+//Specify the MyExternalID field in an upsert
+upsert sObjectList Account.Fields.MyExternalId;
+
+
+////Create&Insert a contact, create another contact, use an upsert to update the first & Create the second
+//
+//Insert the Josh contact
+Contact josh = new Contact(FirstName='Josh',LastName='Kaplan',Department='Finance');
+insert josh;
+
+//Josh's record has been inserted
+//	so the variable josh now has an ID
+//	which will be used to match the records by upsert
+josh.Description = 'Josh\'s record has been updated by the upsert operation.';
+//Note the forward slash before the apostrophe s. This seems necessary for text inserts
+
+//Create the Kathy contact, but don't persist it in the database
+Contact kathy = new Contact(FirstName='Kathy',LastName='Brown',Department='Technology');
+
+//List to hold the new contacts to upsert
+List<Contact> contacts = new List<Contact> {josh, kathy };
+    
+    //Call upsert
+    upsert contacts;
+
+//Result: Josh is updated and Kathy is created.
+
+
+
+////Create/Insert a new Contact, upsert on email as the idLookup
+Contact jane = new Contact(FirstName='Jane',
+                          LastName='Smith',
+                          Email='jane.smith@example.com',
+                          Description='Contact of the day');
+insert jane;
+
+//1. Upsert using an idLookup field
+//Create a second sObject variable.
+//This variable doesn't have any ID set.
+Contact jane2 = new Contact(FirstName='Jane',
+                          LastName='Smith',
+                          Email='jane.smith@example.com',
+                          Description='Prefers to be contacted by email');
+//Upsert the contact by using the idLookup field for matching.
+upsert jane2 Contact.fields.Email;
+
+//Verify that the contact has been updated
+System.assertEquals('Prefers to be contacted by email',
+                   [SELECT Description FROM Contact WHERE Id=:jane.Id].Description);
+
+
+
+////Deleting Records
+contact[] contactsDel = [SELECT Id FROM Contact WHERE LastName='Ruiz'];
+delete contactsDel;
+
+//Delete Account
+account[] accountsDel = [SELECT Id FROM Account WHERE Name='SFDC Account'];
+delete accountsDel;
+
+
+
+////Cathcing DmlException using a catch block
+try {
+    //This causes an expection because
+    //	the required Name field is not provided.
+    Account acct = new Account();
+    //Insert the account
+    insert acct;
+} catch (DmlException e) {
+    System.debug('A DML exception has occurred: ' +
+                e.getMessage());
+}
+
+
+
+////Database Methods that perform the same operations that the DML statements do. 
+////The main difference is that the Methods using the Database class allow for partial success.
+Database.insert(recordList, false);
+////return result objects containing success or failure information for each record
+//Update & Insert return Database.SaveResult objects
+Database.SaveResult[] results = Database.insert(recordList, false);
+//Upserts return Database.UpsertResult objects
+//Delete returns Database.DeleteResult objects
+
+
+
+
+////Two equivalent statements on insert using the database insert method
+////allOrNone is active by default
+Database.insert(recordList);
+//&
+Database.insert(recordList, true);
+
+
+
+////Bulk insert of Contact records with Partial Success active
+////Insert of 3 records & 1 failure, recorded to the Debug Log
+//Create a list of contacts
+List<Contact> conList = new List<Contact> {
+    new Contact(FirstName='Kelli',LastName='Smith',Department='Finance'),
+    new Contact(FirstName='Caitlin',LastName='Smith',Department='Technology'),
+    new Contact(FirstName='Caroline',LastName='Roth',Department='Finance'),
+    new Contact()
+        };
+
+//Bulk insert all contacts with one DML call
+Database.SaveResult[] srList = Database.insert(conList, false);
+
+//Iternate through each returned result
+for (Database.SaveResult sr : srList) {
+    if (sr.isSuccess()) {
+        //Operation was successful, so get the ID of the record that was processed
+        System.debug('Successfuly inserted contact. Contact ID: ' + sr.getId());
+    } else {
+        //Operation failed, so get all errors
+        for(Database.Error err : sr.getErrors()) {
+            System.debug('The following error has occurred.');
+            System.debug(err.getStatusCode() + ': ' + err.getMessage());
+            System.debug('Contact fields that affected this error: ' + err.getFields());
+        }
+    }
+}
+
+
+
+////Inserting Related Records
+Account acct = new Account(Name='SFDC Account');
+insert acct;
+
+//Once the account is inserted, the sObject will be
+// populated with an ID.
+//Get this ID.
+ID acctID = acct.ID;
+
+//Add a contact to this account
+Contact mario = new Contact(
+    FirstName='Mario',
+    LastName='Ruiz',
+    Phone='987.456.1234',
+    AccountID=acctID);
+insert mario;
+
+
+
+////Updating Related Records: You cannot update an account in the same DML call that inserts a Contact & relates the two records
+//Query for the contact, which has been associated with an account.
+Contact queriedContact = [SELECT Account.Name
+                         FROM Contact
+                         WHERE FirstName = 'Mario' AND LastName = 'Ruiz'
+                         LIMIT 1];
+
+//Update the contact's phone number
+queriedContact.Phone = '(415)555-1214';
+
+//Update the contact's Department
+queriedContact.Department = 'Homeland Security';
+
+//Update the related account industry
+//queriedContact.Account.Industry = 'Technology';
+
+//Make two seperate calls
+//1. This call is to update the contact's phone
+update queriedContact;
+//2. This call is to update the related account's Industry field
+update queriedContact.Account;
+
+
+
+//Deleting Related Records
+Account[] queriedAccount = [SELECT Id FROM Account WHERE Name = 'SFDC Account'];
+delete queriedAccount;
