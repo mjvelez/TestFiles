@@ -217,3 +217,108 @@ update queriedContact.Account;
 //Deleting Related Records
 Account[] queriedAccount = [SELECT Id FROM Account WHERE Name = 'SFDC Account'];
 delete queriedAccount;
+
+
+
+////SOQL to add in a Contact & a Related Account
+//Add account and related contact
+Account acct = new Account(
+	Name='SFDC Computing',
+	Phone='(415)555-1212',
+	NumberOfEmployees=50,
+	BillingCity='San Francisco');
+insert acct;
+
+//Once the account is inserted, the sObject will be
+//populated with an ID.
+//Get this ID.
+ID acctID = acct.ID;
+    
+//Add a contact to this account
+Contact con = new Contact(
+	FirstName='Carol',
+	LastName='Ruiz',
+	Phone='(415)555-1212',
+	Department='Wingo',
+	AccountId=acctID);
+insert con;
+
+//Add account with no contact
+Account acct2 = new Account(
+	Name='The SFDC Query Man',
+	Phone='(310)555-1213',
+	NumberOfEmployees=50,
+	BillingCity='Los Angeles',
+	Description='Expert in wind technology');
+insert acct2;
+
+
+
+////SOQL Statement in Apex code to return 10 result in the debug console
+Account[] accts = [SELECT Name,Phone
+                  FROM Account
+                  WHERE NumberOfEmployees>25
+                  ORDER BY Name
+                  LIMIT 10];
+System.debug(accts.size() + ' account(s) returned.');
+//Write all account array info
+System.debug(accts);
+
+
+
+////Using an Apex code variable in an SOQL statement, also called a 'bind'
+String targetDepartment = 'Wingo';
+Contact[] techContacts = [SELECT FirstName,LastName
+                         FROM Contact
+                         WHERE Department=:targetDepartment];
+System.debug(techContacts);
+
+
+
+////Querying Related Records
+Account [] acctsWithContacts = [SELECT Name, (SELECT FirstName,LastName FROM Contacts)
+                               	FROM Account
+    							WHERE Name = 'SFDC Computing'];
+//Get child records
+Contact[] cts = acctsWithContacts[0].Contacts;
+System.debug('Name of first associated contact: ' 
+            + cts[0].FirstName + ', ' + cts[0].LastName);
+
+
+
+////Traverse a relationship using dot notation
+Contact[] cts = [SELECT Account.Name 
+                 FROM Contact
+                WHERE FirstName = 'Carol' AND LastName = 'Ruiz'];
+Contact carol = cts[0];
+String acctName = carol.Account.Name;
+System.Debug('Carol\'s account name is ' + acctName);
+
+
+
+//// SOQL for loop
+for (variable : [soql_query]) {
+    code_block
+}
+//OR
+for (variable list : [soql_query]) {
+    
+}
+//Both the variable and variable list need to be the same type as the sObjects that are returned by the soql_query
+//It is preferable to use the sObject list format of the SOQL for loop as teh loop executeds once for each batch of 200 sObjects.
+insert new Account[]{new Account(Name = 'for loop 1'),
+    				new Account(Name = 'for loop 2'),
+    				new Account(Name = 'for loop 3')};
+
+//The sObject list format executes the for loop once per returned batch of records
+Integer i=0;
+Integer j=0;
+for (Account[] tmp : [SELECT Id
+                     FROM Account
+                      WHERE Name LIKE 'for loop _']) {
+       j = tmp.size();
+       i++;
+}
+System.assertEquals(3,j); //The list should have contained the three accounts named 'yyy'
+System.assertEquals(1,i); //Since a single batch can hold up to 200 records and only three records should have been returned,
+						  // the loop should have executed only once
